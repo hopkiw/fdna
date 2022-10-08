@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package fdna;
+
+option go_package = "github.com/hopkiw/fdna/fdna";
+
+service Fdna {
+  rpc Get(GetRequest) returns (GetResponse) {}
+  rpc Gossip(GossipRequest) returns (GossipResponse) {}
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse) {}
+}
+
+message GossipRequest {
+  repeated Record records = 1;
+}
+
+message GossipResponse {
+  repeated Record records = 1;
+}
+
+message GetRequest {
+}
+
+message GetResponse {
+  repeated Record records = 1;
+}
+
+message HeartbeatRequest {
+  Record record = 1;
+}
+
+message HeartbeatResponse {
+  string result = 1;
+}
+
+message Record {
+  string svc = 1;
+  string zone = 2;
+  string endpoint = 3;
+  State state = 4;
+}
+
+enum State {
+  STATE_UNSPECIFIED = 0;
+  STATE_HEALTHY = 1;
+  STATE_UNHEALTHY = 2;
+} 
