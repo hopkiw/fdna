@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package fdna;
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/hopkiw/fdna/fdna";
 
 service Fdna {
@@ -38,6 +40,7 @@ message Record {
   string zone = 2;
   string endpoint = 3;
   State state = 4;
+  google.protobuf.Timestamp last_updated = 5;
 }
 
 enum State {

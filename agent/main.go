@@ -15,6 +15,7 @@ import (
 	pb "github.com/hopkiw/fdna/fdna"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var (
@@ -35,7 +36,7 @@ type server struct {
 // Record is a record
 type Record struct {
 	*pb.Record
-	LastUpdated time.Time
+	//LastUpdated time.Time
 }
 
 // UpdateStatus updates a records status
@@ -43,7 +44,7 @@ func (d *Record) UpdateStatus(t time.Time) {
 	if d.GetEndpoint() == self {
 		return
 	}
-	if t.Sub(d.LastUpdated) > unhealthyThreshold {
+	if t.Sub(d.GetLastUpdated().AsTime()) > unhealthyThreshold {
 		log.Printf("marking %v unhealthy, it was last heard from at %v", d.Endpoint, d.LastUpdated)
 		d.State = pb.State_STATE_UNHEALTHY
 	}
@@ -51,7 +52,7 @@ func (d *Record) UpdateStatus(t time.Time) {
 
 // Dead returns whether a record is dead
 func (d *Record) Dead() bool {
-	return d.State == pb.State_STATE_UNHEALTHY && time.Now().Sub(d.LastUpdated) > deadThreshold
+	return d.State == pb.State_STATE_UNHEALTHY && time.Now().Sub(d.GetLastUpdated().AsTime()) > deadThreshold
 }
 
 // Gossip trades records
@@ -73,21 +74,22 @@ func (s *server) Gossip(ctx context.Context, in *pb.GossipRequest) (*pb.GossipRe
 }
 
 func updateRecordMap(records []*pb.Record) {
-	now := time.Now()
+	//now := time.Now()
 	for _, record := range records {
 		// skip records for my host
 		if record.GetEndpoint() == self {
 			continue
 		}
 		if existing, ok := recordMap[record.GetEndpoint()]; ok {
-			if record.State == pb.State_STATE_HEALTHY {
-				log.Printf("i heard %v is healthy", existing.Endpoint)
-				existing.State = record.State
-				existing.LastUpdated = now
+			if record.GetLastUpdated().AsTime().After(existing.GetLastUpdated().AsTime()) {
+				if record.State == pb.State_STATE_HEALTHY {
+					existing.LastUpdated = record.LastUpdated
+					existing.State = record.State
+				}
 			}
 		} else {
-			log.Printf("i learned %v is healthy", record.Endpoint)
-			recordMap[record.GetEndpoint()] = &Record{record, now}
+			log.Printf("i learned about %v", record.Endpoint)
+			recordMap[record.GetEndpoint()] = &Record{record}
 		}
 	}
 }
@@ -109,12 +111,14 @@ func (s *server) Heartbeat(ctx context.Context, in *pb.HeartbeatRequest) (*pb.He
 // Heartbeat receives a heartbeat for a service
 func Heartbeat(in *pb.HeartbeatRequest) (*pb.HeartbeatResponse, error) {
 	log.Printf("Heartbeat()")
-	now := time.Now()
-	if record, ok := recordMap[in.GetRecord().GetEndpoint()]; ok {
-		record.State = pb.State_STATE_HEALTHY
-		record.LastUpdated = now
+	now := timestamppb.Now()
+	newRecord := in.GetRecord()
+	if existing, ok := recordMap[newRecord.GetEndpoint()]; ok {
+		existing.State = pb.State_STATE_HEALTHY
+		existing.LastUpdated = now
 	} else {
-		recordMap[in.GetRecord().GetEndpoint()] = &Record{in.GetRecord(), now}
+		newRecord.LastUpdated = now
+		recordMap[in.GetRecord().GetEndpoint()] = &Record{newRecord}
 	}
 
 	return &pb.HeartbeatResponse{Result: "Success"}, nil

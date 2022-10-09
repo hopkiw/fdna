@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"sort"
 	"time"
 
 	pb "github.com/hopkiw/fdna/fdna"
@@ -73,7 +74,13 @@ func main() {
 		if err != nil {
 			log.Fatalf("Could not get records: %v", err)
 		}
-		for _, record := range r.GetRecords() {
+		//func Slice(x any, less func(i, j int) bool)
+		records := r.GetRecords()
+		sortRecords := func(i, j int) bool {
+			return records[i].GetEndpoint() > records[j].GetEndpoint()
+		}
+		sort.Slice(records, sortRecords)
+		for _, record := range records {
 			log.Printf("Records: %v", record)
 		}
 		os.Exit(0)
